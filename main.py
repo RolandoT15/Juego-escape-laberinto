@@ -4,13 +4,16 @@ import sys
 from mapa.muro import Muro
 from mapa.suelo import Suelo
 from mapa.constantes import FILAS, COLUMNAS,ANCHO_VENTANA, ALTO_VENTANA, TILE_SIZE, COLUMNAS, FILAS,AZUL_META, ROJO_INICIO, NEGRO,BLANCO
-
+from mapa.liana import Liana
+from mapa.tunel import Tunel
 
 # lOGICA
 class Inicio:
     def __init__(self, x, y):
         self.rect = pygame.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
         self.color = ROJO_INICIO
+        self.pasa_jugador = True
+        self.pasa_enemigo = True
 
     def dibujar(self, superficie):
         pygame.draw.rect(superficie, self.color, self.rect)
@@ -20,6 +23,8 @@ class Meta:
     def __init__(self, x, y):
         self.rect = pygame.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
         self.color = AZUL_META
+        self.pasa_jugador = True
+        self.pasa_enemigo = True
 
     def dibujar(self, superficie):
         pygame.draw.rect(superficie, self.color, self.rect)
@@ -45,10 +50,17 @@ class GeneradorMapa:
                 if f == 0 or f == self.filas - 1 or c == 0 or c == self.columnas - 1:
                     fila_objs.append(Muro(c, f))
                 else:
-                    if random.random() < 0.40:
+                    azar = random.random()
+
+                    if azar < 0.35:
                         fila_objs.append(Muro(c, f))
+                    elif azar < 0.40:
+                        fila_objs.append(Liana(c, f))
+                    elif azar < 0.45:
+                        fila_objs.append(Tunel(c, f))
                     else:
-                        fila_objs.append(Suelo(c,f))
+                        fila_objs.append(Suelo(c, f))
+
             self.mapa_objetos.append(fila_objs)
 
         # Puntos de inicio y final
@@ -82,7 +94,11 @@ class GeneradorMapa:
 
             # Si las coordenadas donde se esta no es la meta, usar el objeto de suelo
             if (x,y) != (mx,my):
-                self.mapa_objetos[y][x] = Suelo(x,y)
+
+                objeto_actual = self.mapa_objetos[y][x]
+
+                if not objeto_actual.pasa_jugador:
+                    self.mapa_objetos[y][x] = Suelo(x,y)
 
 
 
