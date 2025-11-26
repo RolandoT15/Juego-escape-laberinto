@@ -1,6 +1,7 @@
 import pygame
 from mapa.constantes import TILE_SIZE
 
+#hola
 
 class Jugador:
     def __init__(self, x, y):
