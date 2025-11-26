@@ -5,6 +5,8 @@ import random
 
 pygame.init()
 
+#hola
+
 # ----- CONFIGURACIÓN DE VENTANA -----
 WIDTH, HEIGHT = 800, 600
 window = pygame.display.set_mode((WIDTH, HEIGHT))
