@@ -1,4 +1,4 @@
-# juego_con_mapa.py
+# JUEGO PERSECUSION
 import pygame
 import random
 import sys
