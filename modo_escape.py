@@ -1,4 +1,3 @@
-# JUEGO PERSECUSION
 import pygame
 import random
 import sys
@@ -8,9 +7,12 @@ import time
 # Importo los módulos del mapa tal y como vienen en tu primer código
 from mapa.muro import Muro
 from mapa.suelo import Suelo
-from mapa.constantes import FILAS, COLUMNAS, ANCHO_VENTANA, ALTO_VENTANA, TILE_SIZE, AZUL_META, ROJO_INICIO, NEGRO, BLANCO
+from mapa.constantes import FILAS, COLUMNAS, ANCHO_VENTANA, ALTO_VENTANA, TILE_SIZE, AZUL_META, ROJO_INICIO, NEGRO, \
+    BLANCO
 from mapa.liana import Liana
 from mapa.tunel import Tunel
+from mapa.trampas import Trampa
+
 
 # ---------------------------
 # CLASES DEL GENERADOR (copiadas / adaptadas)
@@ -101,6 +103,7 @@ class GeneradorMapa:
                 if not getattr(objeto_actual, 'pasa_jugador', False):
                     self.mapa_objetos[y][x] = Suelo(x, y)
 
+
 # ---------------------------
 # CONFIGURACIÓN DEL JUEGO
 # ---------------------------
@@ -108,6 +111,13 @@ pygame.init()
 pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
 pygame.display.set_caption("Juego integrado - Mapa + Entidades")
 reloj = pygame.time.Clock()
+
+# Trampas
+trampas = []  # Lista para almacenar las trampas activas
+max_trampas = 3  # Número máximo de trampas simultáneas
+ultimo_tiempo_trampa = 0  # Para controlar el cooldown de colocación
+cooldown_trampa = 5  # En segundos
+puntos = 0  # Puntuación del jugador
 
 # Generador y mapa
 generador = GeneradorMapa(FILAS, COLUMNAS)
@@ -117,7 +127,7 @@ PLAYER_SIZE = max(4, TILE_SIZE - 6)
 ENEMY_SIZE = max(4, TILE_SIZE - 10)
 
 # Variables del jugador
-player_speed_walk = 2.8    # velocidad en pixels/frame (más bajo porque tiles más pequeños)
+player_speed_walk = 2.8  # velocidad en pixels/frame (más bajo porque tiles más pequeños)
 player_speed_run = 5.0
 player_color = (50, 150, 255)
 
@@ -131,6 +141,7 @@ energy_consumption = 0.9
 
 # Enemigos (lista de dicts): x,y,spawn_x,spawn_y,visible,respawn_time
 enemy_speed = 1.5  # Velocidad de persecución (ajustable)
+
 
 # ---------------------------
 # UTILIDADES: buscar tiles/posiciones
@@ -148,21 +159,26 @@ def tile_coords_from_rect(rect):
             coords.append((tx, ty))
     return coords
 
+
 def tile_at(tx, ty):
     if 0 <= ty < generador.filas and 0 <= tx < generador.columnas:
         return generador.mapa_objetos[ty][tx]
     return None
 
+
 def is_passable_for_player(tx, ty):
     t = tile_at(tx, ty)
     return t is not None and getattr(t, 'pasa_jugador', False)
+
 
 def is_passable_for_enemy(tx, ty):
     t = tile_at(tx, ty)
     return t is not None and getattr(t, 'pasa_enemigo', False)
 
+
 def world_pos_center_of_tile(tx, ty):
     return (tx * TILE_SIZE + TILE_SIZE / 2, ty * TILE_SIZE + TILE_SIZE / 2)
+
 
 # ---------------------------
 # Inicializar jugador en tile Inicio
@@ -220,23 +236,25 @@ for i in range(min(num_enemies, len(spawns))):
         'respawn_time': 0.0
     })
 
+
 # ---------------------------
 # FUNCIÓN PARA REINICIAR POSICIONES
 # ---------------------------
 def reset_positions():
     """Reinicia jugador y enemigos a sus posiciones iniciales"""
     global player_x, player_y, energy
-    
+
     # Reiniciar jugador
     player_x = player_spawn_x
     player_y = player_spawn_y
     energy = max_energy  # Restaurar energía completa
-    
+
     # Reiniciar enemigos
     for e in enemies:
         e['x'] = e['spawn_x']
         e['y'] = e['spawn_y']
         e['visible'] = True
+
 
 # ---------------------------
 # COLISIÓN TILE-BASED: comprobar si rect puede moverse dx,dy
@@ -262,6 +280,7 @@ def can_move_rect(rect, dx, dy, for_enemy=False):
                     return False
     return True
 
+
 # ---------------------------
 # EMPUJE SIMPLE ENTRE ENTIDADES (cuando se superponen)
 # ---------------------------
@@ -273,7 +292,7 @@ def push_back_entities(rect_a, rect_b):
     if dx == 0 and dy == 0:
         dx = 1
     dist = math.hypot(dx, dy)
-    overlap = (rect_a.width/2 + rect_b.width/2) - dist
+    overlap = (rect_a.width / 2 + rect_b.width / 2) - dist
     if dist != 0 and overlap > 0:
         dx /= dist
         dy /= dist
@@ -282,6 +301,7 @@ def push_back_entities(rect_a, rect_b):
         rect_b.y += int(dy * (overlap / 2))
         rect_a.x -= int(dx * (overlap / 2))
         rect_a.y -= int(dy * (overlap / 2))
+
 
 # ---------------------------
 # BUCLE PRINCIPAL
@@ -296,8 +316,12 @@ while running:
             running = False
         if evento.type == pygame.KEYDOWN:
             if evento.key == pygame.K_SPACE:
-                # regenerar mapa y reposicionar jugador y enemigos
+                # regenerar mapa, reposicionar jugador y enemigos y limpar trampas
                 generador.generar()
+
+                trampas = []
+                ultimo_tiempo_trampa = 0
+
                 # reposicionar jugador en el nuevo Inicio
                 found = False
                 for y in range(generador.filas):
@@ -325,16 +349,27 @@ while running:
                     ex = cx - ENEMY_SIZE / 2
                     ey = cy - ENEMY_SIZE / 2
                     enemies.append({
-                        'x': float(ex), 
-                        'y': float(ey), 
+                        'x': float(ex),
+                        'y': float(ey),
                         'spawn_x': float(ex),
                         'spawn_y': float(ey),
-                        'spawn_tx': tx, 
-                        'spawn_ty': ty, 
-                        'visible': True, 
+                        'spawn_tx': tx,
+                        'spawn_ty': ty,
+                        'visible': True,
                         'respawn_time': 0.0
                     })
+            elif evento.key == pygame.K_t:
+                tiempo_actual = time.time()
+                # Verificar cooldown y número máximo de trampas
+                if tiempo_actual - ultimo_tiempo_trampa >= cooldown_trampa and len(trampas) < max_trampas:
+                    # Obtener la posición actual del jugador en tiles
+                    tile_x = int(player_x // TILE_SIZE)
+                    tile_y = int(player_y // TILE_SIZE)
 
+                    # Crear nueva trampa en la posición del jugador
+                    nueva_trampa = Trampa(tile_x, tile_y)
+                    trampas.append(nueva_trampa)
+                    ultimo_tiempo_trampa = tiempo_actual
     # ----- ENTRADAS -----
     keys = pygame.key.get_pressed()
     speed = player_speed_walk
@@ -405,12 +440,12 @@ while running:
 
         ex = e['x']
         ey = e['y']
-        
+
         # vector DESDE enemigo HACIA jugador (perseguir)
         vdx = player_x - ex
         vdy = player_y - ey
         dist = math.hypot(vdx, vdy)
-        
+
         if dist == 0:
             # Si están en la misma posición, no moverse
             continue
@@ -442,8 +477,8 @@ while running:
             else:
                 # probar perpendiculares y giros simples
                 attempts = [
-                    (desired_dy, desired_dx),   # swap
-                    (-desired_dx, -desired_dy), # invert
+                    (desired_dy, desired_dx),  # swap
+                    (-desired_dx, -desired_dy),  # invert
                     (desired_dx, -desired_dy),
                     (-desired_dx, desired_dy),
                     (enemy_speed, 0),
@@ -462,6 +497,40 @@ while running:
         e['x'] = float(enemy_rect.x)
         e['y'] = float(enemy_rect.y)
 
+    # Verificar colisión de enemigos con trampas y actualizar estado
+    trampas_a_eliminar = []
+    for i, trampa in enumerate(trampas):
+        if not trampa.activa:
+            trampas_a_eliminar.append(i)
+            continue
+
+        for idx, e in enumerate(enemies):
+            if not e['visible']:
+                continue
+
+            enemy_rect = pygame.Rect(int(e['x']), int(e['y']), ENEMY_SIZE, ENEMY_SIZE)
+            if trampa.rect.colliderect(enemy_rect):
+                # Enemigo eliminado por trampa
+                e['visible'] = False
+                e['respawn_time'] = time.time() + 10  # Reaparece después de 10 segundos
+                trampa.desactivar()
+                trampas_a_eliminar.append(i)
+
+                # Incrementar puntuación
+                puntos += 50  # O el valor que prefieras
+                break
+
+    # Eliminar trampas desactivadas (en orden inverso para no afectar los índices)
+    for i in sorted(trampas_a_eliminar, reverse=True):
+        if i < len(trampas):
+            trampas.pop(i)
+
+    # Actualizar estado de respawn de los enemigos
+    for e in enemies:
+        if not e['visible'] and time.time() >= e['respawn_time']:
+            e['visible'] = True
+            e['x'] = e['spawn_x']
+            e['y'] = e['spawn_y']
     # ----- COLISIÓN ENTRE ENTIDADES (evitar superposición) -----
     player_rect = pygame.Rect(int(player_x), int(player_y), PLAYER_SIZE, PLAYER_SIZE)
     enemy_rects = []
@@ -479,7 +548,7 @@ while running:
         if player_rect.colliderect(er) and enemies[idx]['visible']:
             collision_detected = True
             break
-    
+
     # Si hay colisión, reiniciar todas las posiciones
     if collision_detected:
         reset_positions()
@@ -499,6 +568,24 @@ while running:
         for objeto in fila:
             objeto.dibujar(pantalla)
 
+    # En la sección de dibujado, después de dibujar el mapa
+    # Dibujar trampas activas
+    for trampa in trampas:
+        trampa.dibujar(pantalla)
+
+    # Para mostrar información sobre trampas y puntuación, añade:
+    font = pygame.font.SysFont(None, 24)
+    texto_trampas = font.render(f"Trampas: {len(trampas)}/{max_trampas}", True, BLANCO)
+    texto_puntos = font.render(f"Puntos: {puntos}", True, BLANCO)
+    pantalla.blit(texto_trampas, (ANCHO_VENTANA - 150, 20))
+    pantalla.blit(texto_puntos, (ANCHO_VENTANA - 150, 50))
+
+    # Si quieres mostrar el cooldown de las trampas:
+    if time.time() - ultimo_tiempo_trampa < cooldown_trampa:
+        cooldown_restante = int(cooldown_trampa - (time.time() - ultimo_tiempo_trampa))
+        texto_cooldown = font.render(f"Cooldown: {cooldown_restante}s", True, BLANCO)
+        pantalla.blit(texto_cooldown, (ANCHO_VENTANA - 150, 80))
+
     # Dibujar jugador (centrado en su rect)
     pygame.draw.rect(pantalla, player_color, (int(player_x), int(player_y), PLAYER_SIZE, PLAYER_SIZE))
 
@@ -510,7 +597,8 @@ while running:
     # Dibujar barra vertical de energía a la izquierda
     pygame.draw.rect(pantalla, (100, 100, 100), (10, 20, energy_bar_width, energy_bar_height))  # marco
     current_height = int((energy / max_energy) * energy_bar_height)
-    pygame.draw.rect(pantalla, (0, 200, 0), (10, 20 + (energy_bar_height - current_height), energy_bar_width, current_height))
+    pygame.draw.rect(pantalla, (0, 200, 0),
+                     (10, 20 + (energy_bar_height - current_height), energy_bar_width, current_height))
 
     pygame.display.flip()
 
