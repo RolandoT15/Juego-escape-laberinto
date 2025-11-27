@@ -105,10 +105,10 @@ def pantalla_simular_juego(leaderboard_manager, player_manager):
                             # 2. EJECUTAR EL JUEGO EXTERNO
                             # Pasamos la pantalla actual y el nombre
                             if modo_seleccionado == "modo_escapa":
-                                # Llama a la funcion de tu archivo modo_escapa.py
+                                # Llama a la funcion de  archivo modo_escapa.py
                                 puntuacion = modo_escape.ejecutar_juego(pantalla, nombre_jugador)
                             elif modo_seleccionado == "modo_cazador":
-                                # Llama a la funcion de tu archivo modo_cazador.py
+                                # Llama a la funcion de archivo modo_cazador.py
                                 puntuacion = modo_cazador.ejecutar_juego(pantalla, nombre_jugador)
 
                             # 3. Al terminar el juego (return), cambiamos a fase terminado
