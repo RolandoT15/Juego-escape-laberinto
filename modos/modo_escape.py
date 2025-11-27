@@ -1,4 +1,3 @@
-# juego_con_mapa.py
 import pygame
 import random
 import sys
@@ -11,6 +10,7 @@ from mapa.suelo import Suelo
 from mapa.constantes import FILAS, COLUMNAS, ANCHO_VENTANA, ALTO_VENTANA, TILE_SIZE, AZUL_META, ROJO_INICIO, NEGRO, BLANCO
 from mapa.liana import Liana
 from mapa.tunel import Tunel
+from objetos.trampas import Trampa
 
 # ---------------------------
 # CLASES DEL GENERADOR (copiadas / adaptadas)
@@ -108,6 +108,14 @@ pygame.init()
 pantalla = pygame.display.set_mode((ANCHO_VENTANA, ALTO_VENTANA))
 pygame.display.set_caption("Juego integrado - Mapa + Entidades")
 reloj = pygame.time.Clock()
+
+#Trampas
+trampas = []  # Lista para almacenar las trampas activas
+max_trampas = 3  # Número máximo de trampas simultáneas
+ultimo_tiempo_trampa = 0  # Para controlar el cooldown de colocación
+cooldown_trampa = 5  # En segundos
+puntos = 0  # Puntuación del jugador
+
 
 # Generador y mapa
 generador = GeneradorMapa(FILAS, COLUMNAS)
@@ -296,8 +304,12 @@ while running:
             running = False
         if evento.type == pygame.KEYDOWN:
             if evento.key == pygame.K_SPACE:
-                # regenerar mapa y reposicionar jugador y enemigos
+                # regenerar mapa, reposicionar jugador y enemigos y limpar trampas
                 generador.generar()
+
+                trampas = []
+                ultimo_tiempo_trampa = 0
+
                 # reposicionar jugador en el nuevo Inicio
                 found = False
                 for y in range(generador.filas):
@@ -310,7 +322,7 @@ while running:
                             found = True
                             break
                     if found: break
-                # recalcular spawns y reposicionar enemigos a sus nuevos spawns
+            # recalcular spawns y reposicionar enemigos a sus nuevos spawns
                 spawns = []
                 for y in range(generador.filas):
                     for x in range(generador.columnas):
@@ -334,7 +346,18 @@ while running:
                         'visible': True, 
                         'respawn_time': 0.0
                     })
+            elif evento.key == pygame.K_t:
+                tiempo_actual = time.time()
+                # Verificar cooldown y número máximo de trampas
+                if tiempo_actual - ultimo_tiempo_trampa >= cooldown_trampa and len(trampas) < max_trampas:
+                    # Obtener la posición actual del jugador en tiles
+                    tile_x = int(player_x // TILE_SIZE)
+                    tile_y = int(player_y // TILE_SIZE)
 
+                    # Crear nueva trampa en la posición del jugador
+                    nueva_trampa = Trampa(tile_x, tile_y)
+                    trampas.append(nueva_trampa)
+                    ultimo_tiempo_trampa = tiempo_actual
     # ----- ENTRADAS -----
     keys = pygame.key.get_pressed()
     speed = player_speed_walk
@@ -462,6 +485,40 @@ while running:
         e['x'] = float(enemy_rect.x)
         e['y'] = float(enemy_rect.y)
 
+    # Verificar colisión de enemigos con trampas y actualizar estado
+    trampas_a_eliminar = []
+    for i, trampa in enumerate(trampas):
+        if not trampa.activa:
+            trampas_a_eliminar.append(i)
+            continue
+
+        for idx, e in enumerate(enemies):
+            if not e['visible']:
+                continue
+
+            enemy_rect = pygame.Rect(int(e['x']), int(e['y']), ENEMY_SIZE, ENEMY_SIZE)
+            if trampa.rect.colliderect(enemy_rect):
+                # Enemigo eliminado por trampa
+                e['visible'] = False
+                e['respawn_time'] = time.time() + 10  # Reaparece después de 10 segundos
+                trampa.desactivar()
+                trampas_a_eliminar.append(i)
+
+                # Incrementar puntuación
+                puntos += 50  # O el valor que prefieras
+                break
+
+    # Eliminar trampas desactivadas (en orden inverso para no afectar los índices)
+    for i in sorted(trampas_a_eliminar, reverse=True):
+        if i < len(trampas):
+            trampas.pop(i)
+
+    # Actualizar estado de respawn de los enemigos
+    for e in enemies:
+        if not e['visible'] and time.time() >= e['respawn_time']:
+            e['visible'] = True
+            e['x'] = e['spawn_x']
+            e['y'] = e['spawn_y']
     # ----- COLISIÓN ENTRE ENTIDADES (evitar superposición) -----
     player_rect = pygame.Rect(int(player_x), int(player_y), PLAYER_SIZE, PLAYER_SIZE)
     enemy_rects = []
@@ -498,6 +555,24 @@ while running:
     for fila in generador.mapa_objetos:
         for objeto in fila:
             objeto.dibujar(pantalla)
+
+    # En la sección de dibujado, después de dibujar el mapa
+    # Dibujar trampas activas
+    for trampa in trampas:
+        trampa.dibujar(pantalla)
+
+    # Para mostrar información sobre trampas y puntuación, añade:
+    font = pygame.font.SysFont(None, 24)
+    texto_trampas = font.render(f"Trampas: {len(trampas)}/{max_trampas}", True, BLANCO)
+    texto_puntos = font.render(f"Puntos: {puntos}", True, BLANCO)
+    pantalla.blit(texto_trampas, (ANCHO_VENTANA - 150, 20))
+    pantalla.blit(texto_puntos, (ANCHO_VENTANA - 150, 50))
+
+    # Si quieres mostrar el cooldown de las trampas:
+    if time.time() - ultimo_tiempo_trampa < cooldown_trampa:
+        cooldown_restante = int(cooldown_trampa - (time.time() - ultimo_tiempo_trampa))
+        texto_cooldown = font.render(f"Cooldown: {cooldown_restante}s", True, BLANCO)
+        pantalla.blit(texto_cooldown, (ANCHO_VENTANA - 150, 80))
 
     # Dibujar jugador (centrado en su rect)
     pygame.draw.rect(pantalla, player_color, (int(player_x), int(player_y), PLAYER_SIZE, PLAYER_SIZE))
