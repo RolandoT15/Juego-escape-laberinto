@@ -5,28 +5,17 @@ from mapa.constantes import TILE_SIZE, NEGRO, BLANCO
 
 class Trampa:
     def __init__(self, x, y):
-        """
-        Inicializa una trampa en la posición (x, y) del mapa.
 
-        Args:
-            x: Posición en columnas (coordenada horizontal)
-            y: Posición en filas (coordenada vertical)
-        """
         self.rect = pygame.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-        self.color = BLANCO  # Color base de la trampa
-        self.color_borde = NEGRO  # Color del borde
-        self.activa = True  # Estado de la trampa (activa/desactivada)
-        self.tiempo_creacion = time.time()  # Momento en que se creó la trampa
-        self.pasa_jugador = True  # El jugador puede pasar por encima sin efecto
-        self.pasa_enemigo = True  # El enemigo puede pasar por encima (pero será eliminado)
+        self.color = BLANCO
+        self.color_borde = NEGRO
+        self.activa = True
+        self.tiempo_creacion = time.time()
+        self.pasa_jugador = True
+        self.pasa_enemigo = True
 
     def dibujar(self, superficie):
-        """
-        Dibuja la trampa en la superficie indicada.
 
-        Args:
-            superficie: La superficie de pygame donde se dibujará la trampa
-        """
         if self.activa:
             # Dibujar base de la trampa
             pygame.draw.rect(superficie, self.color, self.rect)
@@ -43,5 +32,4 @@ class Trampa:
             pygame.draw.rect(superficie, self.color_borde, self.rect, 2)
 
     def desactivar(self):
-        """Desactiva la trampa (después de atrapar a un cazador)"""
         self.activa = False

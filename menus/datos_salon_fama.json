@@ -1,0 +1,46 @@
+{
+    "modo_escapa": [
+        {
+            "nombre": "rolando",
+            "puntuacion": 2684
+        },
+        {
+            "nombre": "rolando",
+            "puntuacion": 2377
+        },
+        {
+            "nombre": "rolando",
+            "puntuacion": 1467
+        },
+        {
+            "nombre": "rolando",
+            "puntuacion": 810
+        },
+        {
+            "nombre": "rolando",
+            "puntuacion": 150
+        }
+    ],
+    "modo_cazador": [
+        {
+            "nombre": "rolando",
+            "puntuacion": 2050
+        },
+        {
+            "nombre": "rolando",
+            "puntuacion": 0
+        },
+        {
+            "nombre": "rolando",
+            "puntuacion": 0
+        },
+        {
+            "nombre": "rolando",
+            "puntuacion": 0
+        },
+        {
+            "nombre": "rolando",
+            "puntuacion": -500
+        }
+    ]
+}
